@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Omnichain Assistant</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <h2>🔍 Ask a LayerZero Question</h2>
+    <form method="post" action="/ask">
+        <input type="text" name="question" placeholder="E.g. What is DVN?" required>
+        <button type="submit">Ask</button>
+    </form>
+
+    {% if answer %}
+        <h3>Answer:</h3>
+        <div class="answer">{{ answer }}</div>
+    {% endif %}
+
+    <hr>
+
+    <h2>✍️ Generate a Thread</h2>
+    <form method="post" action="/thread">
+        <input type="text" name="topic" placeholder="E.g. Stargate OFTs explained" required>
+        <button type="submit">Generate</button>
+    </form>
+
+    {% if thread %}
+        <h3>Thread:</h3>
+        <pre class="thread">{{ thread }}</pre>
+    {% endif %}
+</body>
+</html>

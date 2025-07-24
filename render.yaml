@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: omnichain-assistant
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: ./start.sh
+    plan: free
+    envVars:
+      - key: OPENAI_API_KEY
+        value: your-openai-key
+      - key: TELEGRAM_TOKEN
+        value: your-telegram-token
+      - key: OFT_API_KEY
+        value: your-oft-key
+      - key: SCAN_API_KEY
+        value: optional
