@@ -1,0 +1,41 @@
+# 🧠 Primer Omnichain Assistant
+
+A unified app that combines:
+- A FastAPI web interface
+- A Telegram bot
+- Retrieval-Augmented Generation (RAG) via Qdrant
+- Thread generation using OpenAI
+
+## 🛠️ Features
+
+- 🔍 Ask questions and get context-aware answers from LayerZero docs
+- 🧵 Generate Twitter-style threads on any topic
+- 💬 Works via both web UI and Telegram
+- 🔒 Rate-limited to avoid spam
+
+---
+
+## 🚀 Local Setup
+
+1. **Clone the repo**:
+```bash
+git clone https://github.com/YOUR_USERNAME/primer_omnichain_assistant.git
+cd primer_omnichain_assistant
+
+install dependencies
+
+```pip install -r requirements.txt```
+
+create env file
+
+```cp .env.sample .env
+# Then fill in your actual keys
+```
+
+Run the Project: ```chmod +x start.sh
+./start.sh```
+
+ API & Bot
+FastAPI: http://localhost:8000
+
+Telegram Bot: responds to /start, /thread [topic], or any message

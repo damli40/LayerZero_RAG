@@ -4,7 +4,7 @@ from fastapi.templating import Jinja2Templates
 import sys
 import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from rag.query import ask_question
+from rag.query import query_rag
 from generate.thread import generate_thread
 
 router = APIRouter()
@@ -16,7 +16,7 @@ async def home(request: Request):
 
 @router.post("/ask", response_class=HTMLResponse)
 async def ask(request: Request, question: str = Form(...)):
-    answer = ask_question(question)
+    answer = query_rag(question)
     return templates.TemplateResponse("index.html", {
         "request": request,
         "question": question,

@@ -1,43 +1,62 @@
-# rag/query.py
+# rag/query_rag.py
 
 import os
-from langchain_openai import ChatOpenAI, OpenAIEmbeddings
-from langchain_chroma import Chroma
-from langchain.chains import RetrievalQA
 from dotenv import load_dotenv
+from langchain_openai import OpenAIEmbeddings, ChatOpenAI
+from langchain_core.documents import Document
+from langchain_community.vectorstores.qdrant import Qdrant  # ✅ Corrected import
+from qdrant_client import QdrantClient
 
 load_dotenv()
 
-def ask_question(query: str, k: int = 4) -> str:
-    """
-    Loads Chroma vector store and uses RAG to answer the query.
-    """
-    print(f" Asking: {query}")
+QDRANT_URL = os.getenv("QDRANT_URL")
+QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
+QDRANT_COLLECTION_NAME = os.getenv("QDRANT_COLLECTION_NAME")
 
-    # Load vectorstore
-    embedding = OpenAIEmbeddings()
-    vectordb = Chroma(persist_directory="rag/chroma_db", embedding_function=embedding)
+# Set up retriever
+def get_relevant_documents(query: str, k: int = 4) -> list[Document]:
+    embeddings = OpenAIEmbeddings()
 
-    # Build retriever
-    retriever = vectordb.as_retriever(search_kwargs={"k": k})
-
-    # Set up GPT model
-    llm = ChatOpenAI(model="gpt-4", temperature=0.5)
-
-    # RAG chain: Retriever → LLM
-    qa_chain = RetrievalQA.from_chain_type(
-        llm=llm,
-        retriever=retriever,
-        return_source_documents=True
+    qdrant_client = QdrantClient(
+        url=QDRANT_URL,
+        api_key=QDRANT_API_KEY
     )
 
-    result = qa_chain.invoke(query)
-    answer = result["result"]
+    qdrant_vectorstore = Qdrant(
+        client=qdrant_client,
+        collection_name=QDRANT_COLLECTION_NAME,
+        embeddings=embeddings,
+    )
 
-    print("🧠 Answer generated:")
-    return answer
+    retriever = qdrant_vectorstore.as_retriever(search_kwargs={"k": k})
+    return retriever.invoke(query)  # ✅ Correct method
 
+# Format context into prompt
+def build_metaprompt(question: str, docs: list[Document]) -> str:
+    context = "\n\n".join([doc.page_content for doc in docs])
+    return f"""
+You are a knowledgeable assistant for the LayerZero ecosystem.
+Use the following context to answer the user's question.
+If the answer is not found in the context, say "I don't know".
+
+Context:
+{context}
+
+Question: {question}
+
+Answer:"""
+
+# Run the RAG query
+def query_rag(question: str, k: int = 4) -> str:
+    docs = get_relevant_documents(question, k=k)  # Pass k to retriever
+    metaprompt = build_metaprompt(question, docs)
+
+    llm = ChatOpenAI(model="gpt-4o", temperature=0)
+    response = llm.invoke(metaprompt)
+    return response.content
+
+# Example usage
 if __name__ == "__main__":
-    user_q = input("Ask a LayerZero question: ")
-    response = ask_question(user_q)
-    print(response)
+    user_question = input("Ask a question: ")
+    print("\n🧠 Answer:")
+    print(query_rag(user_question))
