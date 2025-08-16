@@ -18,6 +18,9 @@ COPY . .
 # Ensure startup script is executable
 RUN chmod +x /app/start.sh
 
+# Create an empty .env so slowapi's Config(".env") does not fail
+RUN touch /app/.env
+
 # Expose FastAPI port
 EXPOSE 8000
 
