@@ -9,9 +9,20 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --upgrade pip && pip install -r requirements.txt
 
-# Install supervisor
-RUN apt-get update && apt-get install -y supervisor
+# Install supervisor and curl for healthchecks
+RUN apt-get update && apt-get install -y supervisor curl \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY . .
+
+# Ensure startup script is executable
+RUN chmod +x /app/start.sh
+
+# Expose FastAPI port
+EXPOSE 8000
+
+# Basic healthcheck hitting FastAPI health endpoint
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD curl -fsS http://localhost:8000/health || exit 1
 
 CMD ["./start.sh"]

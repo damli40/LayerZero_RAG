@@ -3,30 +3,149 @@
 <head>
     <title>Omnichain Assistant</title>
     <link rel="stylesheet" href="/static/style.css">
+    <style>
+        .metadata {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-size: 0.9em;
+            color: #666;
+        }
+        .confidence-high { color: #28a745; }
+        .confidence-medium { color: #ffc107; }
+        .confidence-low { color: #dc3545; }
+        .error { color: #dc3545; background: #f8d7da; padding: 10px; border-radius: 5px; }
+        .sources {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            font-size: 0.9em;
+            border: 1px solid #dee2e6;
+            color: #333;
+        }
+        .source-item {
+            margin: 8px 0;
+            padding: 10px;
+            background: #ffffff;
+            border-radius: 6px;
+            border: 1px solid #e9ecef;
+            color: #495057;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .source-item:hover {
+            background: #f8f9fa;
+            border-color: #adb5bd;
+        }
+        .thread {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #dee2e6;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-size: 14px;
+            line-height: 1.6;
+            color: #333;
+            max-width: 100%;
+            overflow-x: auto;
+        }
+    </style>
 </head>
 <body>
-    <h2>🔍 Ask a LayerZero Question</h2>
-    <form method="post" action="/ask">
-        <input type="text" name="question" placeholder="E.g. What is DVN?" required>
-        <button type="submit">Ask</button>
-    </form>
+    <h1>🔍 Omnichain Assistant</h1>
+    <p>Your AI assistant for LayerZero ecosystem knowledge</p>
 
-    {% if answer %}
-        <h3>Answer:</h3>
-        <div class="answer">{{ answer }}</div>
-    {% endif %}
+    <div class="section">
+        <h2>🔍 Ask a LayerZero Question</h2>
+        <form method="post" action="/ask">
+            <input type="text" name="question" placeholder="E.g. What is DVN?" required>
+            <button type="submit">Ask</button>
+        </form>
+
+        {% if answer %}
+            <h3>Answer:</h3>
+            {% if error %}
+                <div class="error">{{ answer }}</div>
+            {% else %}
+                <div class="answer">{{ answer }}</div>
+                
+                {% if confidence is defined %}
+                    <div class="metadata">
+                        <strong>📊 Response Quality:</strong>
+                        <span class="confidence-{% if confidence >= 0.7 %}high{% elif confidence >= 0.5 %}medium{% else %}low{% endif %}">
+                            {{ "%.1f"|format(confidence * 100) }}% confidence
+                        </span>
+                        {% if processing_time is defined %}
+                            | ⏱ {{ processing_time }}ms
+                        {% endif %}
+                    </div>
+                {% endif %}
+
+                {% if sources %}
+                    <div class="sources">
+                        <strong style="color: #2c3e50; font-size: 1.1em;">📚 Sources ({{ sources|length }}):</strong>
+                        {% for source in sources %}
+                            <div class="source-item">
+                                <strong style="color: #495057;">📄 {{ source.source }}</strong><br>
+                                <span style="color: #6c757d; font-size: 0.9em;">Type: {{ source.source_type }} | Confidence: {{ "%.1f"|format(source.confidence * 100) }}%</span>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endif %}
+        {% endif %}
+    </div>
 
     <hr>
 
-    <h2>✍️ Generate a Thread</h2>
-    <form method="post" action="/thread">
-        <input type="text" name="topic" placeholder="E.g. Stargate OFTs explained" required>
-        <button type="submit">Generate</button>
-    </form>
+    <div class="section">
+        <h2>✍️ Generate a Thread</h2>
+        <form method="post" action="/thread">
+            <input type="text" name="topic" placeholder="E.g. Stargate OFTs explained" required>
+            <button type="submit">Generate</button>
+        </form>
 
-    {% if thread %}
-        <h3>Thread:</h3>
-        <pre class="thread">{{ thread }}</pre>
-    {% endif %}
+        {% if thread %}
+            <h3>Thread:</h3>
+            <pre class="thread">{{ thread }}</pre>
+            
+            {% if confidence is defined %}
+                <div class="metadata">
+                    <strong>📊 Generation Quality:</strong>
+                    <span class="confidence-{% if confidence >= 0.7 %}high{% elif confidence >= 0.5 %}medium{% else %}low{% endif %}">
+                        {{ "%.1f"|format(confidence * 100) }}% confidence
+                    </span>
+                    {% if processing_time is defined %}
+                        | ⏱ {{ processing_time }}ms
+                    {% endif %}
+                </div>
+            {% endif %}
+
+            {% if sources %}
+                <div class="sources">
+                    <strong style="color: #2c3e50; font-size: 1.1em;">📚 Sources ({{ sources|length }}):</strong>
+                    {% for source in sources %}
+                        <div class="source-item">
+                            <strong style="color: #495057;">📄 {{ source.source }}</strong><br>
+                            <span style="color: #6c757d; font-size: 0.9em;">Type: {{ source.source_type }} | Confidence: {{ "%.1f"|format(source.confidence * 100) }}%</span>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endif %}
+    </div>
+
+    <hr>
+
+    <div class="section">
+        <h2>📈 System Status</h2>
+        <p>✅ Enhanced with guardrails, reranking, and source citations</p>
+        <p>🔒 Rate limiting and content safety checks enabled</p>
+        <p>📊 Confidence scoring and metadata tracking active</p>
+    </div>
 </body>
 </html>

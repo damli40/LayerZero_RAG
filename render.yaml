@@ -1,16 +1,58 @@
 services:
   - type: web
-    name: omnichain-assistant
+    name: omnichain-assistant-web
     env: python
-    buildCommand: pip install -r requirements.txt
-    startCommand: ./start.sh
+    pythonVersion: 3.10.13
     plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    autoDeploy: true
+    disk:
+      name: data
+      mountPath: /app/data
+      sizeGB: 1
     envVars:
       - key: OPENAI_API_KEY
-        value: your-openai-key
-      - key: TELEGRAM_TOKEN
-        value: your-telegram-token
+        sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: QDRANT_URL
+        sync: false
+      - key: QDRANT_API_KEY
+        sync: false
+      - key: QDRANT_COLLECTION_NAME
+        value: layerzero-rag
       - key: OFT_API_KEY
-        value: your-oft-key
+        sync: false
       - key: SCAN_API_KEY
-        value: optional
+        sync: false
+
+  - type: worker
+    name: omnichain-assistant-bot
+    env: python
+    pythonVersion: 3.10.13
+    numInstances: 1
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python bot/bot.py
+    autoDeploy: true
+    disk:
+      name: data
+      mountPath: /app/data
+      sizeGB: 1
+    envVars:
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: QDRANT_URL
+        sync: false
+      - key: QDRANT_API_KEY
+        sync: false
+      - key: QDRANT_COLLECTION_NAME
+        value: layerzero-rag
+      - key: OFT_API_KEY
+        sync: false
+      - key: SCAN_API_KEY
+        sync: false

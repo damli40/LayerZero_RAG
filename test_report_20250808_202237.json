@@ -1,0 +1,74 @@
+[
+  {
+    "test": "Health Endpoint",
+    "status": "PASS",
+    "details": "Status: healthy",
+    "timestamp": "2025-08-08T20:22:08.804635"
+  },
+  {
+    "test": "Web Interface",
+    "status": "PASS",
+    "details": "Main page loads successfully",
+    "timestamp": "2025-08-08T20:22:10.835553"
+  },
+  {
+    "test": "Basic Query",
+    "status": "FAIL",
+    "details": "Status code: 422",
+    "timestamp": "2025-08-08T20:22:12.868542"
+  },
+  {
+    "test": "Thread Generation",
+    "status": "FAIL",
+    "details": "Status code: 422",
+    "timestamp": "2025-08-08T20:22:14.903531"
+  },
+  {
+    "test": "Analytics Endpoint",
+    "status": "PASS",
+    "details": "Total queries: 0",
+    "timestamp": "2025-08-08T20:22:16.938075"
+  },
+  {
+    "test": "Rate Limiting",
+    "status": "INFO",
+    "details": "No rate limiting detected (may be configured for higher limits)",
+    "timestamp": "2025-08-08T20:22:27.650961"
+  },
+  {
+    "test": "Content Safety",
+    "status": "FAIL",
+    "details": "Status code: 422",
+    "timestamp": "2025-08-08T20:22:29.688182"
+  },
+  {
+    "test": "Metadata Database",
+    "status": "FAIL",
+    "details": "Database file not found",
+    "timestamp": "2025-08-08T20:22:29.688182"
+  },
+  {
+    "test": "Source Citations",
+    "status": "FAIL",
+    "details": "Status code: 422",
+    "timestamp": "2025-08-08T20:22:31.723318"
+  },
+  {
+    "test": "Confidence Scoring",
+    "status": "FAIL",
+    "details": "Status code: 422",
+    "timestamp": "2025-08-08T20:22:33.772522"
+  },
+  {
+    "test": "Performance Metrics",
+    "status": "FAIL",
+    "details": "Status code: 422",
+    "timestamp": "2025-08-08T20:22:35.791899"
+  },
+  {
+    "test": "Error Handling",
+    "status": "FAIL",
+    "details": "Status code: 422",
+    "timestamp": "2025-08-08T20:22:37.822241"
+  }
+]

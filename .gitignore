@@ -1,2 +1,10 @@
 .env
 rag/chroma_db
+.env
+data/**
+!data/docs/**
+!data/thread_templates/**
+__pycache__/
+*.pyc
+.venv/
+*.sqlite3
