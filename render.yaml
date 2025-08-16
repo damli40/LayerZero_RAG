@@ -2,7 +2,6 @@ services:
   - type: web
     name: omnichain-assistant-web
     env: docker
-    plan: free
     dockerCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
     autoDeploy: true
@@ -30,7 +29,6 @@ services:
     name: omnichain-assistant-bot
     env: docker
     numInstances: 1
-    plan: free
     dockerCommand: python bot/bot.py
     autoDeploy: true
     disk:
