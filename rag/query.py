@@ -10,7 +10,7 @@ from langchain_community.vectorstores.qdrant import Qdrant
 from qdrant_client import QdrantClient
 
 # Import our new modules
-from rag.rerank import rerank_documents
+from rag.rerank import rerank_documents, is_rerank_enabled
 from rag.guardrails import get_guardrails, ToolCategory
 from rag.metadata_db import get_metadata_db
 
@@ -160,12 +160,12 @@ def query_rag(
                 "sources": []
             }
         
-        # Rerank documents
+        # Rerank documents (or fallback if disabled)
         reranked_results = rerank_documents(
             query=question,
             documents=docs,
             top_k=k,
-            confidence_threshold=confidence_threshold
+            confidence_threshold=confidence_threshold,
         )
         
         if not reranked_results:

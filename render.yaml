@@ -12,6 +12,8 @@ services:
     envVars:
       - key: OPENAI_API_KEY
         sync: false
+      - key: RERANK_ENABLED
+        value: "false"
       - key: TELEGRAM_BOT_TOKEN
         sync: false
       - key: QDRANT_URL
@@ -38,6 +40,8 @@ services:
     envVars:
       - key: OPENAI_API_KEY
         sync: false
+      - key: RERANK_ENABLED
+        value: "false"
       - key: TELEGRAM_BOT_TOKEN
         sync: false
       - key: QDRANT_URL
