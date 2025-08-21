@@ -5,7 +5,7 @@ import sys
 import os
 import time
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from rag.query import query_rag
+from rag.query import query_rag, check_qdrant_ready
 from generate.thread import generate_thread
 from rag.metadata_db import get_metadata_db
 from rag.guardrails import get_guardrails
@@ -103,4 +103,21 @@ async def health_check():
         "status": "healthy",
         "timestamp": time.time(),
         "version": "1.0.0"
+    }
+
+@router.get("/ready", response_class=JSONResponse)
+async def readiness_check():
+    """Readiness check: verify Qdrant connectivity and required env."""
+    problems = []
+    # OpenAI key present
+    if not os.getenv("OPENAI_API_KEY"):
+        problems.append("OPENAI_API_KEY missing")
+    # Qdrant connectivity
+    q = check_qdrant_ready()
+    if not q.get("ok"):
+        problems.append(f"Qdrant not ready: {q.get('error')}")
+    return {
+        "ready": len(problems) == 0,
+        "problems": problems,
+        "timestamp": time.time(),
     }

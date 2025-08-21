@@ -1,14 +1,16 @@
 # rag/ingest.py
 
 import os
+import hashlib
+from typing import List, Dict
 from langchain_community.document_loaders import TextLoader, PyMuPDFLoader
-from langchain.text_splitter import CharacterTextSplitter
+from langchain.text_splitter import MarkdownHeaderTextSplitter, RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import Qdrant
 from langchain_openai import OpenAIEmbeddings
 from dotenv import load_dotenv
 from qdrant_client import QdrantClient
 from qdrant_client.http.models import VectorParams, Distance
-import uuid
+from langchain_core.documents import Document
 from datetime import datetime
 
 load_dotenv()
@@ -19,20 +21,38 @@ def embed_documents(
     template_folder="data/thread_templates"
 ):
     print("📥 Loading documents...")
-    all_docs = []
+    all_docs: List[Document] = []
+
+    def _stable_document_id(source_type: str, path: str) -> str:
+        content = f"{source_type}:{os.path.abspath(path)}"
+        return hashlib.md5(content.encode("utf-8")).hexdigest()
+
+    def _source_weight_for(source_type: str) -> float:
+        if source_type == "pdf":
+            return 1.1
+        if source_type == "template":
+            return 0.9
+        return 1.0
 
     # Load txt and md files
     for filename in os.listdir(source_folder):
         if filename.endswith(".txt") or filename.endswith(".md"):
-            loader = TextLoader(os.path.join(source_folder, filename), encoding="utf-8")
+            file_path = os.path.join(source_folder, filename)
+            loader = TextLoader(file_path, encoding="utf-8")
             docs = loader.load()
-            # Add metadata for source tracking
             for doc in docs:
+                source_type = "text"
+                document_id = _stable_document_id(source_type, file_path)
                 doc.metadata.update({
                     "source": filename,
-                    "source_type": "text",
+                    "path": file_path,
+                    "source_type": source_type,
                     "ingestion_date": datetime.utcnow().isoformat(),
-                    "doc_id": str(uuid.uuid4())
+                    "source_weight": _source_weight_for(source_type),
+                    # keep backward-compatible key expected by reranker
+                    "doc_id": document_id,
+                    # provide explicit stable id
+                    "document_id": document_id,
                 })
             all_docs.extend(docs)
 
@@ -40,15 +60,20 @@ def embed_documents(
     if os.path.exists(pdf_folder):
         for filename in os.listdir(pdf_folder):
             if filename.endswith(".pdf"):
-                loader = PyMuPDFLoader(os.path.join(pdf_folder, filename))
+                file_path = os.path.join(pdf_folder, filename)
+                loader = PyMuPDFLoader(file_path)
                 docs = loader.load()
-                # Add metadata for source tracking
                 for doc in docs:
+                    source_type = "pdf"
+                    document_id = _stable_document_id(source_type, file_path)
                     doc.metadata.update({
                         "source": filename,
-                        "source_type": "pdf",
+                        "path": file_path,
+                        "source_type": source_type,
                         "ingestion_date": datetime.utcnow().isoformat(),
-                        "doc_id": str(uuid.uuid4())
+                        "source_weight": _source_weight_for(source_type),
+                        "doc_id": document_id,
+                        "document_id": document_id,
                     })
                 all_docs.extend(docs)
 
@@ -56,23 +81,74 @@ def embed_documents(
     if os.path.exists(template_folder):
         for filename in os.listdir(template_folder):
             if filename.endswith(".md"):
-                loader = TextLoader(os.path.join(template_folder, filename), encoding="utf-8")
+                file_path = os.path.join(template_folder, filename)
+                loader = TextLoader(file_path, encoding="utf-8")
                 docs = loader.load()
-                # Add metadata for source tracking
                 for doc in docs:
+                    source_type = "template"
+                    document_id = _stable_document_id(source_type, file_path)
                     doc.metadata.update({
                         "source": filename,
-                        "source_type": "template",
+                        "path": file_path,
+                        "source_type": source_type,
                         "ingestion_date": datetime.utcnow().isoformat(),
-                        "doc_id": str(uuid.uuid4())
+                        "source_weight": _source_weight_for(source_type),
+                        "doc_id": document_id,
+                        "document_id": document_id,
                     })
                 all_docs.extend(docs)
 
     print(f"🔍 Loaded {len(all_docs)} documents.")
 
-    # Split text
-    splitter = CharacterTextSplitter(chunk_size=800, chunk_overlap=100)
-    chunks = splitter.split_documents(all_docs)
+    # First: structure-aware split for Markdown by headers
+    structured_docs: List[Document] = []
+    md_header_splitter = MarkdownHeaderTextSplitter(
+        headers_to_split_on=[
+            ("#", "h1"),
+            ("##", "h2"),
+            ("###", "h3"),
+            ("####", "h4"),
+        ]
+    )
+
+    for doc in all_docs:
+        source_type = doc.metadata.get("source_type", "text")
+        source_name = doc.metadata.get("source", "")
+        if source_type in {"text", "template"} and source_name.endswith(".md"):
+            header_docs = md_header_splitter.split_text(doc.page_content)
+            for hdoc in header_docs:
+                new_meta: Dict = doc.metadata.copy()
+                new_meta.update(hdoc.metadata or {})
+                # Build section path and title
+                section_keys = [key for key in ["h1", "h2", "h3", "h4"] if new_meta.get(key)]
+                section_vals = [new_meta[key] for key in section_keys]
+                section_path = " > ".join(section_vals) if section_vals else None
+                title = new_meta.get("h1") or new_meta.get("title")
+                if section_path:
+                    new_meta["section_path"] = section_path
+                if title:
+                    new_meta["title"] = title
+                structured_docs.append(
+                    Document(page_content=hdoc.page_content, metadata=new_meta)
+                )
+        else:
+            structured_docs.append(doc)
+
+    print(f"🧱 Structured into {len(structured_docs)} sections (markdown-aware).")
+
+    # Second: recursive character splitter to create embedding chunks
+    splitter = RecursiveCharacterTextSplitter(chunk_size=1200, chunk_overlap=200)
+    chunks: List[Document] = splitter.split_documents(structured_docs)
+
+    # Assign chunk indices per stable document id
+    per_doc_counters: Dict[str, int] = {}
+    for chunk in chunks:
+        document_id = chunk.metadata.get("document_id") or chunk.metadata.get("doc_id") or "unknown"
+        per_doc_counters.setdefault(document_id, 0)
+        idx = per_doc_counters[document_id]
+        chunk.metadata["chunk_index"] = idx
+        per_doc_counters[document_id] = idx + 1
+
     print(f"✂️ Split into {len(chunks)} chunks.")
 
     # Embeddings - Using text-embedding-3-large

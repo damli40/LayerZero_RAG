@@ -1,6 +1,7 @@
 # rag/query_rag.py
 
 import os
+import sys
 import time
 from typing import Dict, List, Optional, Tuple
 from dotenv import load_dotenv
@@ -10,17 +11,37 @@ from langchain_community.vectorstores.qdrant import Qdrant
 from qdrant_client import QdrantClient
 
 # Import our new modules
+try:
+    # Ensure project root on sys.path when running directly (python rag/query.py)
+    CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+    PROJECT_ROOT = os.path.abspath(os.path.join(CURRENT_DIR, os.pardir))
+    if PROJECT_ROOT not in sys.path:
+        sys.path.insert(0, PROJECT_ROOT)
+except Exception:
+    pass
+
 from rag.rerank import rerank_documents, is_rerank_enabled
 from rag.guardrails import get_guardrails, ToolCategory
 from rag.metadata_db import get_metadata_db
+from rag.utils.glossary import augment_query_for_retrieval, find_glossary_expansions
 
 load_dotenv()
 
 QDRANT_URL = os.getenv("QDRANT_URL")
 QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
-QDRANT_COLLECTION_NAME = os.getenv("QDRANT_COLLECTION_NAME")
+QDRANT_COLLECTION_NAME = os.getenv("QDRANT_COLLECTION_NAME", "layerzero-rag")
 
-def get_relevant_documents(query: str, k: int = 8) -> List[Document]:
+def check_qdrant_ready() -> Dict[str, any]:
+    """Lightweight readiness check for Qdrant connectivity."""
+    try:
+        client = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY)
+        # Simple call to verify connectivity
+        client.get_collections()
+        return {"ok": True}
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}
+
+def get_relevant_documents(query: str, k: int = 8, use_mmr: bool = True) -> List[Document]:
     """
     Get relevant documents from vector store with enhanced retrieval.
     
@@ -48,7 +69,18 @@ def get_relevant_documents(query: str, k: int = 8) -> List[Document]:
         embeddings=embeddings,
     )
 
-    retriever = qdrant_vectorstore.as_retriever(search_kwargs={"k": k})
+    if use_mmr:
+        # Maximal Marginal Relevance for diversity
+        retriever = qdrant_vectorstore.as_retriever(
+            search_type="mmr",
+            search_kwargs={
+                "k": k,
+                "fetch_k": max(16, k * 4),
+                "lambda_mult": 0.5,
+            },
+        )
+    else:
+        retriever = qdrant_vectorstore.as_retriever(search_kwargs={"k": k})
     return retriever.invoke(query)
 
 def build_metaprompt(question: str, docs: List[Document], sources: List[Dict]) -> str:
@@ -147,8 +179,43 @@ def query_rag(
         }
     
     try:
-        # Retrieve documents
-        docs = get_relevant_documents(question, k=k*2)  # Get more for reranking
+        # Augment query with domain synonyms/aliases for better recall
+        augmented_question = augment_query_for_retrieval(question)
+        expansions, _matched = find_glossary_expansions(question)
+
+        # Build multiple query variants: original, augmented, and canonical-term variants
+        query_variants: List[str] = []
+        base_q = question.strip()
+        if base_q:
+            query_variants.append(base_q)
+        if augmented_question and augmented_question != base_q:
+            query_variants.append(augmented_question)
+        for canonical in expansions.keys():
+            variant = f"{base_q} {canonical}".strip()
+            if variant and variant not in query_variants:
+                query_variants.append(variant)
+
+        # Limit number of variants to control latency
+        query_variants = query_variants[:5]
+
+        # Retrieve for each variant and merge unique results
+        combined_docs: List[Document] = []
+        seen_keys = set()
+
+        total_candidates = max(k * 2, 8)
+        per_variant_k = max(2, total_candidates // max(1, len(query_variants)))
+
+        for q in query_variants:
+            variant_docs = get_relevant_documents(q, k=per_variant_k)
+            for d in variant_docs:
+                doc_id = d.metadata.get("document_id") or d.metadata.get("doc_id") or d.metadata.get("source") or ""
+                chunk_idx = d.metadata.get("chunk_index") if d.metadata.get("chunk_index") is not None else -1
+                key = (doc_id, chunk_idx, d.page_content[:128])
+                if key not in seen_keys:
+                    seen_keys.add(key)
+                    combined_docs.append(d)
+
+        docs = combined_docs
         
         if not docs:
             return {
@@ -162,7 +229,7 @@ def query_rag(
         
         # Rerank documents (or fallback if disabled)
         reranked_results = rerank_documents(
-            query=question,
+            query=augmented_question,
             documents=docs,
             top_k=k,
             confidence_threshold=confidence_threshold,

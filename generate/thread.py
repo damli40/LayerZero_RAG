@@ -7,7 +7,7 @@ from rag.query import query_rag
 from langchain_openai import ChatOpenAI
 
 def structure_thread_with_llm(context: str, template: str) -> str:
-    llm = ChatOpenAI(model="gpt-4", temperature=0.5)
+    llm = ChatOpenAI(model="gpt-4o", temperature=0.4)
     prompt = (
         f"Given the following context, extract a compelling hook, a main body, and a call to action (CTA). "
         f"Then fill the following template:\n\n"
