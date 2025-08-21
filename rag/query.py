@@ -2,6 +2,7 @@
 
 import os
 import sys
+import math
 import time
 from typing import Dict, List, Optional, Tuple
 from dotenv import load_dotenv
@@ -75,8 +76,8 @@ def get_relevant_documents(query: str, k: int = 8, use_mmr: bool = True) -> List
             search_type="mmr",
             search_kwargs={
                 "k": k,
-                "fetch_k": max(16, k * 4),
-                "lambda_mult": 0.5,
+                "fetch_k": max(32, k * 6),
+                "lambda_mult": 0.55,
             },
         )
     else:
@@ -202,8 +203,8 @@ def query_rag(
         combined_docs: List[Document] = []
         seen_keys = set()
 
-        total_candidates = max(k * 2, 8)
-        per_variant_k = max(2, total_candidates // max(1, len(query_variants)))
+        total_candidates = max(k * 6, 24)
+        per_variant_k = max(2, math.ceil(total_candidates / max(1, len(query_variants))))
 
         for q in query_variants:
             variant_docs = get_relevant_documents(q, k=per_variant_k)
@@ -254,12 +255,39 @@ def query_rag(
             "confidence": result["confidence"],
             "rank": result["rank"]
         } for result in reranked_results]
+
+        # Include neighbor chunks (±1) for top results when available in combined_docs
+        context_docs: List[Document] = list(reranked_docs)
+        try:
+            # Build quick index for combined docs by (document_id, chunk_index)
+            combined_index = {}
+            for d in docs:
+                did = d.metadata.get("document_id") or d.metadata.get("doc_id") or d.metadata.get("source") or ""
+                cidx = d.metadata.get("chunk_index") if d.metadata.get("chunk_index") is not None else -1
+                combined_index[(did, cidx)] = d
+
+            # For top N reranked docs, add neighbors if present
+            TOP_N_FOR_NEIGHBORS = min(2, len(reranked_docs))
+            added_keys = set()
+            for top_doc in reranked_docs[:TOP_N_FOR_NEIGHBORS]:
+                did = top_doc.metadata.get("document_id") or top_doc.metadata.get("doc_id") or top_doc.metadata.get("source") or ""
+                cidx = top_doc.metadata.get("chunk_index") if top_doc.metadata.get("chunk_index") is not None else -1
+                for neighbor_idx in (cidx - 1, cidx + 1):
+                    key = (did, neighbor_idx)
+                    if key in combined_index:
+                        neighbor_doc = combined_index[key]
+                        if neighbor_doc not in context_docs and key not in added_keys:
+                            context_docs.append(neighbor_doc)
+                            added_keys.add(key)
+        except Exception:
+            # Best-effort; ignore neighbor augmentation failures
+            context_docs = list(reranked_docs)
         
         # Calculate overall confidence
         overall_confidence = sum(result["confidence"] for result in reranked_results) / len(reranked_results)
         
-        # Build enhanced prompt
-        metaprompt = build_metaprompt(question, reranked_docs, sources)
+        # Build enhanced prompt with augmented context
+        metaprompt = build_metaprompt(question, context_docs, sources)
         
         # Generate response
         llm = ChatOpenAI(model="gpt-4o", temperature=0)

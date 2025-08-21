@@ -1,6 +1,7 @@
 # rag/guardrails.py
 
 import re
+import os
 import time
 from typing import Dict, List, Optional, Tuple, Any
 from enum import Enum
@@ -59,7 +60,15 @@ class Guardrails:
         Args:
             config: Guardrail configuration
         """
-        self.config = config or GuardrailConfig()
+        # Allow environment override for min confidence threshold
+        cfg = config or GuardrailConfig()
+        try:
+            env_thresh = os.getenv("MIN_CONFIDENCE_THRESHOLD")
+            if env_thresh is not None:
+                cfg.min_confidence_threshold = float(env_thresh)
+        except Exception:
+            pass
+        self.config = cfg
         self.rate_limit_cache = {}  # Simple in-memory rate limiting
         self.user_queries = {}  # Track user query history
     

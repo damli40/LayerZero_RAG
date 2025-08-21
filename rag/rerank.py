@@ -1,6 +1,7 @@
 # rag/rerank.py
 
 import os
+import math
 from typing import List, Dict, Any
 from langchain_core.documents import Document
 from dotenv import load_dotenv
@@ -13,9 +14,8 @@ def _env_truthy(value: str) -> bool:
 
 
 def is_rerank_enabled() -> bool:
-    # Default to disabled in constrained environments
-    # Enable by default; can be disabled with RERANK_ENABLED=false
-    return _env_truthy(os.getenv("RERANK_ENABLED", "true"))
+    # Controlled via environment variable. Default to disabled to be safe in constrained envs.
+    return _env_truthy(os.getenv("RERANK_ENABLED", "false"))
 
 
 class BGEReranker:
@@ -98,7 +98,11 @@ class BGEReranker:
         # Create results with metadata
         results: List[Dict[str, Any]] = []
         for i, (doc, score) in enumerate(zip(documents, scores)):
-            confidence = float(score)
+            # Map cross-encoder score to [0,1] via sigmoid for guardrail compatibility
+            try:
+                confidence = 1.0 / (1.0 + math.exp(-float(score)))
+            except Exception:
+                confidence = float(score)
 
             # Only include documents above confidence threshold
             if confidence >= confidence_threshold:
@@ -140,7 +144,10 @@ class BGEReranker:
             denom = len(q_tokens | d_tokens)
             return float(inter / denom) if denom else 0.0
         score = self.cross_encoder.predict([(query, document_content)])
-        return float(score[0])
+        try:
+            return 1.0 / (1.0 + math.exp(-float(score[0])))
+        except Exception:
+            return float(score[0])
 
 # Global reranker instance
 _reranker = None

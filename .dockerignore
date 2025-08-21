@@ -1,0 +1,45 @@
+# Version control
+.git
+.gitignore
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+*.egg
+
+# Environments
+.env
+.env.*
+.venv/
+venv/
+
+# Node
+node_modules/
+
+# OS/Editor
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.ipynb_checkpoints/
+
+# Caches
+.mypy_cache/
+.pytest_cache/
+.cache/
+
+# Logs and reports
+*.log
+/test_report_*.json
+
+# Large data not needed in image
+/data/
+/x/
+
+# Archives
+*.tar
+*.zip
+*.gz
