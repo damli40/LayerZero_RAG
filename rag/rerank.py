@@ -14,8 +14,8 @@ def _env_truthy(value: str) -> bool:
 
 
 def is_rerank_enabled() -> bool:
-    # Controlled via environment variable. Default to disabled to be safe in constrained envs.
-    return _env_truthy(os.getenv("RERANK_ENABLED", "false"))
+    # Temporarily disabled to reduce RAM usage in production.
+    return False
 
 
 class BGEReranker:

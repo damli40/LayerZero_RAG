@@ -110,24 +110,14 @@ async def thread_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         response_parts = []
         response_parts.append("Thread Generated\n")
         response_parts.append(thread_content)
-        response_parts.append("\n\n---\n")
-        response_parts.append("Metadata:\n")
-        response_parts.append(f"- Confidence: {confidence:.2f}\n")
-        response_parts.append(f"- Processing time: {processing_time} ms\n")
-        if sources:
-            response_parts.append(f"- Sources used: {len(sources)}\n")
+        # Hide metadata in user-facing thread output
 
         full_response = "".join(response_parts)
 
         if len(full_response) > 4096:
             await loading_message.edit_text("Response is long; sending in parts...")
             await update.message.reply_text(thread_content)
-            metadata_text = "\n".join([
-                "",
-                "---",
-                f"Confidence: {confidence:.2f} | Processing time: {processing_time} ms" + (f" | Sources: {len(sources)}" if sources else ""),
-            ])
-            await update.message.reply_text(metadata_text)
+            # No metadata block
         else:
             await loading_message.edit_text(full_response)
 
@@ -181,22 +171,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
 
         response_text = result.get("response", "")
-        confidence = result.get("confidence_score", 0.0)
-        processing_time = result.get("processing_time_ms", 0)
-        sources = result.get("sources", [])
-
-        metadata_text = "\n".join([
-            "",
-            "---",
-            f"Confidence: {confidence:.2f} | Processing time: {processing_time} ms" + (f" | Sources: {len(sources)}" if sources else ""),
-        ])
-
-        full_response = response_text + metadata_text
+        # Hide confidence/sources in user-facing responses
+        full_response = response_text
 
         if len(full_response) > 4096:
             await loading_message.edit_text("Response is long; sending in parts...")
             await update.message.reply_text(response_text)
-            await update.message.reply_text(metadata_text)
         else:
             await loading_message.edit_text(full_response)
 

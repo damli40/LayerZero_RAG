@@ -294,9 +294,9 @@ def query_rag(
         llm_response = llm.invoke(metaprompt)
         response_text = llm_response.content
         
-        # Add source citations
+        # Add source citations (disabled for user-facing output)
         citations = guardrails.format_source_citations(sources)
-        response_with_citations = response_text + citations
+        response_with_citations = response_text
         
         # Sanitize response
         sanitized_response = guardrails.sanitize_response(response_with_citations)
