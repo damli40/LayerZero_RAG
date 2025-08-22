@@ -74,6 +74,7 @@ async def thread_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     topic = " ".join(args)
+    normalized_topic = topic.lower().strip()
 
     loading_message = await update.message.reply_text("Generating thread. This may take up to a minute...")
     typing_task = asyncio.create_task(_typing_loop(context, update.effective_chat.id))
@@ -86,7 +87,7 @@ async def thread_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 thread_content = await _run_blocking_with_timeout(generate_thread, topic, timeout_seconds=REQUEST_TIMEOUT_SECONDS)
                 sources_result = await _run_blocking_with_timeout(
                     query_rag,
-                    topic,
+                    normalized_topic,
                     user_id,
                     "telegram",
                     timeout_seconds=REQUEST_TIMEOUT_SECONDS,
@@ -137,6 +138,7 @@ async def thread_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     user_input = update.message.text
+    normalized_input = (user_input or "").lower().strip()
 
     loading_message = await update.message.reply_text("Processing your request. This may take up to a minute...")
     typing_task = asyncio.create_task(_typing_loop(context, update.effective_chat.id))
@@ -148,7 +150,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             try:
                 result = await _run_blocking_with_timeout(
                     query_rag,
-                    user_input,
+                    normalized_input,
                     user_id,
                     "telegram",
                     timeout_seconds=REQUEST_TIMEOUT_SECONDS,

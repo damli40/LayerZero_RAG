@@ -263,12 +263,46 @@ def query_rag(
                     combined_docs.append(d)
 
         docs = combined_docs
+
+        # Optional precision filter: if glossary expansions are present, prefer
+        # documents that explicitly mention the canonical term or its synonyms.
+        try:
+            if expansions:
+                term_filters: List[str] = []
+                for canonical, extras in expansions.items():
+                    term_filters.append(str(canonical))
+                    for s in list(extras):
+                        term_filters.append(str(s))
+                # Normalize and dedupe
+                norm_terms = []
+                seen_terms = set()
+                for t in term_filters:
+                    t_norm = t.strip().lower()
+                    if t_norm and t_norm not in seen_terms:
+                        seen_terms.add(t_norm)
+                        norm_terms.append(t_norm)
+
+                def _doc_mentions_any(d: Document) -> bool:
+                    body = (d.page_content or "").lower()
+                    title = str(d.metadata.get("title", "")).lower()
+                    section = str(d.metadata.get("section_path", "")).lower()
+                    source = str(d.metadata.get("source", "")).lower()
+                    for term in norm_terms:
+                        if term in body or term in title or term in section or term in source:
+                            return True
+                    return False
+
+                filtered_docs = [d for d in docs if _doc_mentions_any(d)]
+                if filtered_docs:
+                    docs = filtered_docs
+        except Exception:
+            pass
         
         if not docs:
+            clarifier = _build_clarifying_question(question, expansions, [])
             return {
-                "response": "I couldn't find any relevant information in the knowledge base.",
-                "success": False,
-                "error": "no_documents",
+                "response": clarifier,
+                "success": True,
                 "response_id": response_id,
                 "confidence_score": 0.0,
                 "sources": []

@@ -33,7 +33,7 @@ A CPI in Solana is when one program calls the instruction of another program. Fo
 Destination Chain
 The blockchain network that receives and processes a LayerZero message. The destination chain hosts the contract that will execute the received message's instructions through its lzReceive function.
 
-DVN (Decentralized Verifier Network)
+DVN(Decentralized Verifier Network)
 A network of independent verifiers that validate message integrity between chains. DVNs are part of LayerZero's modular security model, allowing applications to configure multiple verification schemes for their messages.
 
 Endpoint

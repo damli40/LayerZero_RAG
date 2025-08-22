@@ -13,7 +13,7 @@ def get_glossary() -> Dict[str, List[str]]:
     """
     return {
         # Core brand/product
-        "layerzero": ["layer zero", "lz", "layerzero labs"],
+        "layerzero": ["layer zero", "lz", "layerzero labs", "LayerZero"],
         # Applications
         "omnichain application": ["oapp", "o-app", "omni app"],
         "omnichain fungible token": ["oft", "o-f-t"],
@@ -24,6 +24,7 @@ def get_glossary() -> Dict[str, List[str]]:
         "decentralized verification network": ["dvn"],
         "endpoint": ["lz endpoint", "layerzero endpoint"],
         "executor": ["lz executor"],
+        "DVNs": ["decentralized verification network", "DVN", "dvn"],
         "oracle": ["lz oracle"],
         "relayer": ["lz relayer"],
         # Common abbreviations
