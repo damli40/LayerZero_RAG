@@ -84,6 +84,52 @@ def get_relevant_documents(query: str, k: int = 8, use_mmr: bool = True) -> List
         retriever = qdrant_vectorstore.as_retriever(search_kwargs={"k": k})
     return retriever.invoke(query)
 
+
+def _build_clarifying_question(
+    original_question: str,
+    expansions: Dict[str, List[str]] | Dict[str, any],
+    candidate_docs: List[Document]
+) -> str:
+    """
+    Compose a short clarifying question using glossary matches and top document metadata.
+    """
+    # Collect possible topics from glossary canonical terms
+    topic_candidates: List[str] = []
+    try:
+        topic_candidates.extend(list(expansions.keys()))
+    except Exception:
+        pass
+
+    # Add titles/section paths from candidate docs
+    for d in candidate_docs[:5]:
+        title = d.metadata.get("title")
+        section = d.metadata.get("section_path")
+        source = d.metadata.get("source")
+        if title and title not in topic_candidates:
+            topic_candidates.append(title)
+        if section and section not in topic_candidates:
+            topic_candidates.append(section)
+        if source and source not in topic_candidates:
+            topic_candidates.append(source)
+
+    # Deduplicate and take top few
+    seen = set()
+    unique_topics: List[str] = []
+    for t in topic_candidates:
+        if not t:
+            continue
+        t_norm = t.strip()
+        if t_norm and t_norm.lower() not in seen:
+            seen.add(t_norm.lower())
+            unique_topics.append(t_norm)
+        if len(unique_topics) >= 3:
+            break
+
+    if unique_topics:
+        options = ", ".join(unique_topics)
+        return f"I need a bit more detail to help. Do you mean: {options}?"
+    return "Could you clarify what you want to know specifically? For example: protocol overview, endpoints, or DVN."
+
 def build_metaprompt(question: str, docs: List[Document], sources: List[Dict]) -> str:
     """
     Build enhanced metaprompt with source information.
@@ -237,10 +283,10 @@ def query_rag(
         )
         
         if not reranked_results:
+            clarifier = _build_clarifying_question(question, expansions, docs)
             return {
-                "response": "I couldn't find any sufficiently relevant information for your query.",
-                "success": False,
-                "error": "low_confidence",
+                "response": clarifier,
+                "success": True,
                 "response_id": response_id,
                 "confidence_score": 0.0,
                 "sources": []
@@ -307,6 +353,16 @@ def query_rag(
         )
         
         if not response_valid:
+            # Provide clarifying question instead of blocking on low confidence
+            if "confidence" in validation_msg.lower():
+                clarifier = _build_clarifying_question(question, expansions, docs)
+                return {
+                    "response": clarifier,
+                    "success": True,
+                    "response_id": response_id,
+                    "confidence_score": overall_confidence,
+                    "sources": sources
+                }
             return {
                 "response": f"Response validation failed: {validation_msg}",
                 "success": False,

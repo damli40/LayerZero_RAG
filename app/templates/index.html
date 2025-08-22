@@ -56,11 +56,11 @@
     </style>
 </head>
 <body>
-    <h1>🔍 Omnichain Assistant</h1>
+    <h1>Omnichain Assistant</h1>
     <p>Your AI assistant for LayerZero ecosystem knowledge</p>
 
     <div class="section">
-        <h2>🔍 Ask a LayerZero Question</h2>
+        <h2>Ask a LayerZero Question</h2>
         <form method="post" action="/ask">
             <input type="text" name="question" placeholder="E.g. What is DVN?" required>
             <button type="submit">Ask</button>
@@ -73,29 +73,9 @@
             {% else %}
                 <div class="answer">{{ answer }}</div>
                 
-                {% if confidence is defined %}
-                    <div class="metadata">
-                        <strong>📊 Response Quality:</strong>
-                        <span class="confidence-{% if confidence >= 0.7 %}high{% elif confidence >= 0.5 %}medium{% else %}low{% endif %}">
-                            {{ "%.1f"|format(confidence * 100) }}% confidence
-                        </span>
-                        {% if processing_time is defined %}
-                            | ⏱ {{ processing_time }}ms
-                        {% endif %}
-                    </div>
-                {% endif %}
+                {# confidence hidden in consumer UI #}
 
-                {% if sources %}
-                    <div class="sources">
-                        <strong style="color: #2c3e50; font-size: 1.1em;">📚 Sources ({{ sources|length }}):</strong>
-                        {% for source in sources %}
-                            <div class="source-item">
-                                <strong style="color: #495057;">📄 {{ source.source }}</strong><br>
-                                <span style="color: #6c757d; font-size: 0.9em;">Type: {{ source.source_type }} | Confidence: {{ "%.1f"|format(source.confidence * 100) }}%</span>
-                            </div>
-                        {% endfor %}
-                    </div>
-                {% endif %}
+                {# sources hidden in consumer UI #}
             {% endif %}
         {% endif %}
     </div>
@@ -103,9 +83,9 @@
     <hr>
 
     <div class="section">
-        <h2>✍️ Generate a Thread</h2>
+        <h2>Generate a Thread</h2>
         <form method="post" action="/thread">
-            <input type="text" name="topic" placeholder="E.g. Stargate OFTs explained" required>
+            <input type="text" name="topic" placeholder="E.g. OFTs explained" required>
             <button type="submit">Generate</button>
         </form>
 
@@ -113,39 +93,19 @@
             <h3>Thread:</h3>
             <pre class="thread">{{ thread }}</pre>
             
-            {% if confidence is defined %}
-                <div class="metadata">
-                    <strong>📊 Generation Quality:</strong>
-                    <span class="confidence-{% if confidence >= 0.7 %}high{% elif confidence >= 0.5 %}medium{% else %}low{% endif %}">
-                        {{ "%.1f"|format(confidence * 100) }}% confidence
-                    </span>
-                    {% if processing_time is defined %}
-                        | ⏱ {{ processing_time }}ms
-                    {% endif %}
-                </div>
-            {% endif %}
+            {# confidence hidden in consumer UI #}
 
-            {% if sources %}
-                <div class="sources">
-                    <strong style="color: #2c3e50; font-size: 1.1em;">📚 Sources ({{ sources|length }}):</strong>
-                    {% for source in sources %}
-                        <div class="source-item">
-                            <strong style="color: #495057;">📄 {{ source.source }}</strong><br>
-                            <span style="color: #6c757d; font-size: 0.9em;">Type: {{ source.source_type }} | Confidence: {{ "%.1f"|format(source.confidence * 100) }}%</span>
-                        </div>
-                    {% endfor %}
-                </div>
-            {% endif %}
+            {# sources hidden in consumer UI #}
         {% endif %}
     </div>
 
     <hr>
 
     <div class="section">
-        <h2>📈 System Status</h2>
-        <p>✅ Enhanced with guardrails, reranking, and source citations</p>
-        <p>🔒 Rate limiting and content safety checks enabled</p>
-        <p>📊 Confidence scoring and metadata tracking active</p>
+        <h2>System Status</h2>
+        <p>Enhanced with guardrails, reranking, and source citations</p>
+        <p>Rate limiting and content safety checks enabled</p>
+        <p>Confidence scoring and metadata tracking active</p>
     </div>
 </body>
 </html>

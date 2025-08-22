@@ -57,37 +57,19 @@ class BGEReranker:
         if not documents:
             return []
             
-        # No-op reranker if model is unavailable
+        # No-op reranker if model is unavailable: assign neutral confidence
         if self.cross_encoder is None:
-            # Lightweight lexical-overlap heuristic as confidence instead of fixed 0.5
-            def _simple_overlap_confidence(q: str, text: str) -> float:
-                q_tokens = {t for t in q.lower().split() if len(t) > 2}
-                if not q_tokens:
-                    return 0.0
-                d_tokens = {t for t in text.lower().split() if len(t) > 2}
-                if not d_tokens:
-                    return 0.0
-                inter = len(q_tokens & d_tokens)
-                # Jaccard-like score clipped to [0, 1]
-                denom = len(q_tokens | d_tokens)
-                return float(inter / denom) if denom else 0.0
-
             fallback_results: List[Dict[str, Any]] = []
             for i, doc in enumerate(documents[: max(top_k, 1)]):
-                conf = _simple_overlap_confidence(query, doc.page_content)
                 fallback_results.append({
                     "document": doc,
-                    "confidence": conf,
+                    "confidence": 0.5,
                     "rank": i + 1,
                     "source": doc.metadata.get("source", "Unknown"),
                     "source_type": doc.metadata.get("source_type", "Unknown"),
                     "doc_id": doc.metadata.get("doc_id", "Unknown"),
                 })
-            # Sort by confidence desc then rank asc
-            fallback_results.sort(key=lambda x: (-x["confidence"], x["rank"]))
-            # Apply threshold filtering if requested
-            filtered = [r for r in fallback_results if r["confidence"] >= confidence_threshold]
-            return filtered[:top_k] if filtered else fallback_results[:top_k]
+            return fallback_results
 
         # Prepare pairs for cross-encoder
         pairs = [(query, doc.page_content) for doc in documents]
@@ -135,14 +117,8 @@ class BGEReranker:
             Confidence score between 0 and 1
         """
         if self.cross_encoder is None:
-            # Fallback to lexical overlap
-            q_tokens = {t for t in query.lower().split() if len(t) > 2}
-            d_tokens = {t for t in document_content.lower().split() if len(t) > 2}
-            if not q_tokens or not d_tokens:
-                return 0.0
-            inter = len(q_tokens & d_tokens)
-            denom = len(q_tokens | d_tokens)
-            return float(inter / denom) if denom else 0.0
+            # Neutral confidence when reranker is disabled
+            return 0.5
         score = self.cross_encoder.predict([(query, document_content)])
         try:
             return 1.0 / (1.0 + math.exp(-float(score[0])))

@@ -45,9 +45,8 @@ async def ask(request: Request, question: str = Form(...)):
         "request": request,
         "question": question,
         "answer": result["response"],
-        "confidence": result.get("confidence_score", 0.0),
+        # hide confidence and sources from consumer UI
         "processing_time": processing_time,
-        "sources": result.get("sources", [])
     })
 
 @router.post("/thread", response_class=HTMLResponse)
@@ -74,9 +73,8 @@ async def thread(request: Request, topic: str = Form(...)):
             "request": request,
             "thread": thread_content,
             "question": topic,
-            "confidence": sources_result.get("confidence_score", 0.0),
+            # hide confidence and sources from consumer UI
             "processing_time": processing_time,
-            "sources": sources_result.get("sources", [])
         })
     except Exception as e:
         return templates.TemplateResponse("index.html", {
