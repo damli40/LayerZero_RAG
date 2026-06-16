@@ -25,6 +25,7 @@ from rag.rerank import rerank_documents, is_rerank_enabled
 from rag.guardrails import get_guardrails, ToolCategory
 from rag.metadata_db import get_metadata_db
 from rag.utils.glossary import augment_query_for_retrieval, find_glossary_expansions
+from observability import get_callback_handler
 
 load_dotenv()
 
@@ -166,7 +167,7 @@ Question: {question}
 Answer:"""
 
 def query_rag(
-    question: str, 
+    question: str,
     user_id: Optional[str] = None,
     client_type: str = "web",
     k: int = 4,
@@ -369,9 +370,17 @@ def query_rag(
         # Build enhanced prompt with augmented context
         metaprompt = build_metaprompt(question, context_docs, sources)
         
-        # Generate response
+        # Generate response (captured by PostHog LLM observability when enabled)
+        ph_handler = get_callback_handler(
+            distinct_id=user_id or "anonymous",
+            trace_id=response_id,
+            client_type=client_type,
+            confidence=round(overall_confidence, 3),
+            num_sources=len(sources),
+        )
         llm = ChatOpenAI(model="gpt-4o", temperature=0)
-        llm_response = llm.invoke(metaprompt)
+        invoke_config = {"callbacks": [ph_handler]} if ph_handler else {}
+        llm_response = llm.invoke(metaprompt, config=invoke_config)
         response_text = llm_response.content
         
         # Add source citations (disabled for user-facing output)

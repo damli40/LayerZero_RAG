@@ -1,5 +1,8 @@
 # app.py
 
+from observability import init_observability
+init_observability()
+
 from rag.query import ask_question
 from generate.thread import generate_thread
 

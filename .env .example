@@ -8,3 +8,7 @@ OPENAI_API_KEY=your-openai-key
 
 # Telegram
 TELEGRAM_BOT_TOKEN=your-telegram-bot-token
+
+# PostHog LLM observability (optional — leave POSTHOG_API_KEY blank to disable)
+POSTHOG_API_KEY=phc_your_project_key
+POSTHOG_HOST=https://us.i.posthog.com
