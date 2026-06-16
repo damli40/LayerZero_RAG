@@ -14,6 +14,11 @@ from generate.thread import generate_thread
 from rag.query import query_rag
 
 load_dotenv()
+
+# Initialize PostHog LLM observability before any LangChain call happens.
+from observability import init_observability
+init_observability()
+
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 
 REQUEST_TIMEOUT_SECONDS = 60

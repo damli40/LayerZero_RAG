@@ -8,6 +8,10 @@ from slowapi.errors import RateLimitExceeded
 
 from app.routes import router as app_router
 
+# Initialize PostHog LLM observability before any LangChain call happens.
+from observability import init_observability
+init_observability()
+
 # Initialize app and limiter
 limiter = Limiter(key_func=get_remote_address)
 app = FastAPI()

@@ -10,6 +10,10 @@ from pathlib import Path
 project_root = Path(__file__).parent
 sys.path.append(str(project_root))
 
+# Initialize PostHog LLM observability before any LangChain call happens.
+from observability import init_observability
+init_observability()
+
 def check_dependencies():
     """Check if all required dependencies are installed."""
     print("🔍 Checking dependencies...")

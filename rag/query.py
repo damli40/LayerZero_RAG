@@ -25,6 +25,7 @@ from rag.rerank import rerank_documents, is_rerank_enabled
 from rag.guardrails import get_guardrails, ToolCategory
 from rag.metadata_db import get_metadata_db
 from rag.utils.glossary import augment_query_for_retrieval, find_glossary_expansions
+from observability import get_callback_handler
 
 load_dotenv()
 
@@ -42,33 +43,43 @@ def check_qdrant_ready() -> Dict[str, any]:
     except Exception as exc:
         return {"ok": False, "error": str(exc)}
 
+# Cache the embeddings client and vectorstore once. get_relevant_documents is
+# called once per query variant, so rebuilding these per call meant re-creating
+# the OpenAI embeddings client and Qdrant connection several times per question.
+_VECTORSTORE = None
+
+
+def _get_vectorstore() -> "Qdrant":
+    global _VECTORSTORE
+    if _VECTORSTORE is None:
+        embeddings = OpenAIEmbeddings(
+            model="text-embedding-3-large",
+            dimensions=3072
+        )
+        qdrant_client = QdrantClient(
+            url=QDRANT_URL,
+            api_key=QDRANT_API_KEY
+        )
+        _VECTORSTORE = Qdrant(
+            client=qdrant_client,
+            collection_name=QDRANT_COLLECTION_NAME,
+            embeddings=embeddings,
+        )
+    return _VECTORSTORE
+
+
 def get_relevant_documents(query: str, k: int = 8, use_mmr: bool = True) -> List[Document]:
     """
     Get relevant documents from vector store with enhanced retrieval.
-    
+
     Args:
         query: User query
         k: Number of documents to retrieve (increased for reranking)
-        
+
     Returns:
         List of relevant documents
     """
-    # Use text-embedding-3-large
-    embeddings = OpenAIEmbeddings(
-        model="text-embedding-3-large",
-        dimensions=3072
-    )
-
-    qdrant_client = QdrantClient(
-        url=QDRANT_URL,
-        api_key=QDRANT_API_KEY
-    )
-
-    qdrant_vectorstore = Qdrant(
-        client=qdrant_client,
-        collection_name=QDRANT_COLLECTION_NAME,
-        embeddings=embeddings,
-    )
+    qdrant_vectorstore = _get_vectorstore()
 
     if use_mmr:
         # Maximal Marginal Relevance for diversity
@@ -166,7 +177,7 @@ Question: {question}
 Answer:"""
 
 def query_rag(
-    question: str, 
+    question: str,
     user_id: Optional[str] = None,
     client_type: str = "web",
     k: int = 4,
@@ -242,8 +253,12 @@ def query_rag(
             if variant and variant not in query_variants:
                 query_variants.append(variant)
 
-        # Limit number of variants to control latency
-        query_variants = query_variants[:5]
+        # Limit number of variants to control latency. Each variant is a separate
+        # embedding call + MMR search; PostHog traces showed the fan-out, not the
+        # gpt-4o call, drove most of the per-question latency. 3 keeps the base
+        # query, the synonym-augmented query, and the top glossary-canonical
+        # variant, which covers recall without the long tail of extra searches.
+        query_variants = query_variants[:3]
 
         # Retrieve for each variant and merge unique results
         combined_docs: List[Document] = []
@@ -369,9 +384,17 @@ def query_rag(
         # Build enhanced prompt with augmented context
         metaprompt = build_metaprompt(question, context_docs, sources)
         
-        # Generate response
+        # Generate response (captured by PostHog LLM observability when enabled)
+        ph_handler = get_callback_handler(
+            distinct_id=user_id or "anonymous",
+            trace_id=response_id,
+            client_type=client_type,
+            confidence=round(overall_confidence, 3),
+            num_sources=len(sources),
+        )
         llm = ChatOpenAI(model="gpt-4o", temperature=0)
-        llm_response = llm.invoke(metaprompt)
+        invoke_config = {"callbacks": [ph_handler]} if ph_handler else {}
+        llm_response = llm.invoke(metaprompt, config=invoke_config)
         response_text = llm_response.content
         
         # Add source citations (disabled for user-facing output)
